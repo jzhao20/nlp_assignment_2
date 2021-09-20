@@ -21,27 +21,19 @@ class DAN(nn.Module):
         #self.drop_out_2=nn.Dropout(drop_out_prob)
         self.g=nn.Tanh()
         self.W=nn.Linear(hidden,output)
-        self.log_softmax=nn.LogSoftmax(dim=1)
+        self.log_softmax=nn.LogSoftmax(dim=0)
         nn.init.xavier_uniform_(self.V.weight)
         nn.init.xavier_uniform_(self.W.weight)
     def forward(self,x,batch_size):
-        #convert this list to a np list of indexes and then convert to tensor
-        max_length=0
-        for batch in x:
-            max_length=max(len(batch),max_length)
-        input=np.zeros((batch_size,max_length),dtype=np.int64)
-        for batch in range(0,batch_size):
-            for i in range(0,len(x[batch])):
-                index=self.word_indexer.index_of(x[batch][i])
-                input[batch][i]=index if index!=-1 else self.word_indexer.index_of("UNK")
+        input=np.zeros(len(x))
+        for i in range (0,len(x)):
+            index=self.word_indexer.index_of(x[i])
+            input[i]=index if index!=-1 else self.word_indexer.index_of("UNK")
         input=self.embedded(torch.LongTensor(input).to(self.device))
-        input=input.mean(1)
-        #input=self.drop_out_1(input)
-        #input=self.drop_out_2(hidden_layer)
+        input=input.mean(0)
         input=self.V(input)
         input=self.W(self.g(input))
-        input_to_softmax=input
-        return self.log_softmax(input_to_softmax)
+        return self.log_softmax(input)
 
 class SentimentClassifier(object):
     """
@@ -103,7 +95,7 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     num_classes=2
     embedding_size=20
     batch_size=1
-    dan=DAN(input_size,embedding_size,num_classes,word_embeddings,batch_size)
+    dan=DAN(input_size,embedding_size,num_classes,word_embeddings)
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dan.to(device)
     initial_learning_rate=.1
@@ -112,15 +104,13 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
         random.seed(0)
         random.shuffle(train_exs)
         total_loss=0
-        for i in range(0,len(train_exs)-batch_size+1):
-            x=[train_exs[j].words for j in range(i,i+batch_size)]
-            y=[[train_exs[j].label==0,train_exs[j].label==1] for j in range(i,i+batch_size)]
+        for i in range(0,len(train_exs)):
+            x=train_exs[i].words 
+            y=[train_exs[i].label==0,train_exs[i].label==1]
             y_onehot=torch.from_numpy(np.asarray(y,dtype=np.int64)).to(device).float()
             dan.zero_grad()
             log_probs=dan.forward(x,batch_size)
-            loss_matrix=torch.matmul(torch.neg(log_probs).t(),y_onehot)
-            #equal to the sum of the main diagnol
-            loss=torch.sum(torch.diagonal(loss_matrix,0))
+            loss=torch.neg(log_probs).dot(y_onehot)
             total_loss+=loss
             loss.backward()
             optimizer.step()
