@@ -9,22 +9,19 @@ from sentiment_data import *
 
 
 class DAN(nn.Module):
-    def __init__(self,input, hidden,output,embedding,batch=1,drop_out_prob=.2):
+    def __init__(self,input, hidden,output,embedding):
         super(DAN,self).__init__()
         self.device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        #input is the size
         self.word_indexer=embedding.word_indexer
         weights=torch.FloatTensor(embedding.vectors)
         self.embedded=nn.Embedding.from_pretrained(weights,padding_idx=0).requires_grad_(False)
-        #self.drop_out_1=nn.Dropout(drop_out_prob)
         self.V=nn.Linear(input,hidden)
-        #self.drop_out_2=nn.Dropout(drop_out_prob)
         self.g=nn.Tanh()
         self.W=nn.Linear(hidden,output)
         self.log_softmax=nn.LogSoftmax(dim=0)
         nn.init.xavier_uniform_(self.V.weight)
         nn.init.xavier_uniform_(self.W.weight)
-    def forward(self,x,batch_size):
+    def forward(self,x,batch_size=1):
         input=np.zeros(len(x))
         for i in range (0,len(x)):
             index=self.word_indexer.index_of(x[i])
@@ -78,7 +75,7 @@ class NeuralSentimentClassifier(SentimentClassifier):
         self.model=dan
     def predict(self, dev_ex:List[str]):
         dan=self.model
-        log_probs=dan.forward(dev_ex,1)
+        log_probs=dan.forward(dev_ex)
         return torch.argmax(log_probs)
 
 
@@ -93,15 +90,14 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     num_epochs=10
     input_size=word_embeddings.get_embedding_length()
     num_classes=2
-    embedding_size=20
+    hidden_size=50
     batch_size=1
-    dan=DAN(input_size,embedding_size,num_classes,word_embeddings)
+    dan=DAN(input_size,hidden_size,num_classes,word_embeddings)
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dan.to(device)
-    initial_learning_rate=.1
+    initial_learning_rate=.001
     optimizer=optim.Adam(dan.parameters(),lr=initial_learning_rate)
     for epoch in range(0,num_epochs):
-        random.seed(0)
         random.shuffle(train_exs)
         total_loss=0
         for i in range(0,len(train_exs)):
@@ -114,7 +110,7 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
             total_loss+=loss
             loss.backward()
             optimizer.step()
-        print(total_loss) 
+        print(f'{epoch} {total_loss}') 
     return NeuralSentimentClassifier(dan)
 
 

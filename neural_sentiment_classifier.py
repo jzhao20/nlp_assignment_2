@@ -26,7 +26,7 @@ def _parse_args():
     parser.add_argument('--blind_test_path', type=str, default='data/test-blind.txt', help='path to blind test set (you should not need to modify)')
     parser.add_argument('--test_output_path', type=str, default='test-blind.output.txt', help='output path for test predictions')
     parser.add_argument('--no_run_on_test', dest='run_on_test', default=True, action='store_false', help='skip printing output on the test set')
-    parser.add_argument('--word_vecs_path', type=str, default='data/glove.6B.50d-relativized.txt', help='path to word embeddings to use')
+    parser.add_argument('--word_vecs_path', type=str, default='data/glove.6B.300d-relativized.txt', help='path to word embeddings to use')
     # Some common args have been pre-populated for you. Again, you can add more during development, but your code needs
     # to run with the default neural_sentiment_classifier for submission.
     parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
