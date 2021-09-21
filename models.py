@@ -23,6 +23,7 @@ class DAN(nn.Module):
         nn.init.xavier_uniform_(self.W.weight)
     def forward(self,x,batch_size=1):
         #convert this list to a np list of indexes and then convert to tensor
+        #longest sentence to create input
         max_length=0
         for batch in x:
             max_length=max(len(batch),max_length)
@@ -30,13 +31,12 @@ class DAN(nn.Module):
         for batch in range(0,batch_size):
             for i in range(0,len(x[batch])):
                 index=self.word_indexer.index_of(x[batch][i])
+                #contains the index into the embedding matrix
                 input[i][batch]=index if index!=-1 else self.word_indexer.index_of("UNK")
         input=self.embedded(torch.LongTensor(input).to(self.device))
         input=input.mean(0)
-        #print(input.size())
         input=self.V(input)
         input=self.W(self.g(input))
-        #print(input)
         return self.log_softmax(input)
 
 class SentimentClassifier(object):
@@ -95,7 +95,7 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     """
     num_epochs=10
     input_size=word_embeddings.get_embedding_length()
-    num_classes=2
+    num_classes=1
     hidden_size=50
     batch_size=2
     dan=DAN(input_size,hidden_size,num_classes,word_embeddings)
@@ -107,11 +107,14 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
         total_loss=0
         random.shuffle(train_exs)
         for i in range(0,len(train_exs)-batch_size+1,batch_size):
+            #row vector which will be later converted to a matrix
             x=[train_exs[j].words for j in range(i,i+batch_size)]
+            #replaced scatter with this 
             y=[[train_exs[j].label==0,train_exs[j].label==1] for j in range(i,i+batch_size)]
             y_onehot=torch.from_numpy(np.asarray(y,dtype=np.int64)).to(device).float()
             dan.zero_grad()
             log_probs=dan.forward(x,batch_size)
+            #the main diagnol of the matrix is euqual to the dot products 
             loss_matrix=torch.matmul(y_onehot,torch.neg(log_probs).t())
             loss=torch.sum(torch.diagonal(loss_matrix,0))
             total_loss+=loss
