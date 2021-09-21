@@ -82,6 +82,7 @@ class NeuralSentimentClassifier(SentimentClassifier):
         self.model=dan
     def predict(self, dev_ex:List[str]):
         dan=self.model
+        #make it a list so it'll work with forward
         log_probs=dan.forward([dev_ex])
         return torch.argmax(log_probs)
 
@@ -95,9 +96,9 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
     """
     num_epochs=10
     input_size=word_embeddings.get_embedding_length()
-    num_classes=1
+    num_classes=2
     hidden_size=50
-    batch_size=2
+    batch_size=1
     dan=DAN(input_size,hidden_size,num_classes,word_embeddings)
     device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dan.to(device)
@@ -114,13 +115,13 @@ def train_deep_averaging_network(args, train_exs: List[SentimentExample], dev_ex
             y_onehot=torch.from_numpy(np.asarray(y,dtype=np.int64)).to(device).float()
             dan.zero_grad()
             log_probs=dan.forward(x,batch_size)
-            #the main diagnol of the matrix is euqual to the dot products 
+            #the main diagnol of the matrix is equal to the dot products 
             loss_matrix=torch.matmul(y_onehot,torch.neg(log_probs).t())
             loss=torch.sum(torch.diagonal(loss_matrix,0))
             total_loss+=loss
             loss.backward()
             optimizer.step()
-        print(total_loss) 
+        print(total_loss)
     return NeuralSentimentClassifier(dan)
 
 
